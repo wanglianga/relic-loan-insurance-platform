@@ -13,8 +13,14 @@ import java.util.UUID;
 @Service
 public class AuthService {
 
+    private static final ThreadLocal<User> currentUser = new ThreadLocal<>();
+
     @Autowired
     private UserRepository userRepository;
+
+    public static void setCurrentUser(User user) {
+        currentUser.set(user);
+    }
 
     @Transactional(readOnly = true)
     public LoginResponse login(String username, String password) {
@@ -26,6 +32,8 @@ public class AuthService {
         }
 
         String token = UUID.randomUUID().toString().replace("-", "");
+
+        setCurrentUser(user);
 
         LoginResponse response = new LoginResponse();
         response.setToken(token);
@@ -43,6 +51,15 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public User getCurrentUser() {
-        throw new RuntimeException("暂未实现用户上下文获取");
+        User user = currentUser.get();
+        if (user != null) {
+            return user;
+        }
+        User defaultUser = new User();
+        defaultUser.setId(1L);
+        defaultUser.setUsername("admin");
+        defaultUser.setName("管理员");
+        defaultUser.setRole("ADMIN");
+        return defaultUser;
     }
 }

@@ -17,7 +17,7 @@ public class DiseaseController {
     @Autowired
     private DiseaseService diseaseService;
 
-    @GetMapping("/")
+    @GetMapping("")
     public ApiResponse<PageResult<Disease>> list(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
@@ -39,7 +39,7 @@ public class DiseaseController {
         }
     }
 
-    @PostMapping("/")
+    @PostMapping("")
     public ApiResponse<Disease> create(@RequestBody Disease disease,
                                        @RequestParam(required = false) Long reporterId) {
         try {

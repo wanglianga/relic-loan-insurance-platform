@@ -26,13 +26,23 @@ public class ArtifactService {
     @Transactional(readOnly = true)
     public Page<Artifact> list(int page, int size, String status, String keyword) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        return artifactRepository.findByConditions(status, keyword, pageable);
+        Page<Artifact> artifactPage = artifactRepository.findByConditions(status, keyword, pageable);
+        artifactPage.getContent().forEach(this::loadRestriction);
+        return artifactPage;
     }
 
     @Transactional(readOnly = true)
     public Artifact getById(Long id) {
-        return artifactRepository.findById(id)
+        Artifact artifact = artifactRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("藏品不存在"));
+        loadRestriction(artifact);
+        return artifact;
+    }
+
+    private void loadRestriction(Artifact artifact) {
+        ArtifactRestriction restriction = artifactRestrictionRepository.findByArtifactId(artifact.getId())
+                .orElse(null);
+        artifact.setRestriction(restriction);
     }
 
     @Transactional

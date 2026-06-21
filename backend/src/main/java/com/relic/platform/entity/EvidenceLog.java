@@ -46,4 +46,9 @@ public class EvidenceLog {
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
+
+    @Transient
+    private String operatorName;
+    @Transient
+    private String artifactName;
 }

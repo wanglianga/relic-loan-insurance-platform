@@ -45,4 +45,7 @@ public class Insurance {
 
     @Column(name = "verified_at")
     private LocalDateTime verifiedAt;
+
+    @Transient
+    private String verifierName;
 }

@@ -17,7 +17,7 @@ public class EvidenceChainController {
     @Autowired
     private EvidenceChainService evidenceChainService;
 
-    @GetMapping("/")
+    @GetMapping("")
     public ApiResponse<PageResult<EvidenceLog>> list(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,

@@ -18,7 +18,7 @@ public class LoanController {
     @Autowired
     private LoanService loanService;
 
-    @GetMapping("/")
+    @GetMapping("")
     public ApiResponse<PageResult<Loan>> list(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -42,7 +42,7 @@ public class LoanController {
         }
     }
 
-    @PostMapping("/")
+    @PostMapping("")
     public ApiResponse<Loan> create(@RequestBody Loan loan,
                                     @RequestParam(required = false) Long applicantId) {
         try {

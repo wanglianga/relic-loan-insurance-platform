@@ -1,10 +1,13 @@
 package com.relic.platform.service;
 
+import com.relic.platform.entity.Artifact;
 import com.relic.platform.entity.Restoration;
 import com.relic.platform.entity.RestorationStep;
+import com.relic.platform.entity.User;
 import com.relic.platform.repository.ArtifactRepository;
 import com.relic.platform.repository.RestorationRepository;
 import com.relic.platform.repository.RestorationStepRepository;
+import com.relic.platform.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -15,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class RestorationService {
@@ -28,16 +32,44 @@ public class RestorationService {
     @Autowired
     private ArtifactRepository artifactRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
     @Transactional(readOnly = true)
     public Page<Restoration> list(int page, int size, String status) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "proposedAt"));
-        return restorationRepository.findByStatus(status, pageable);
+        Page<Restoration> restorationPage = restorationRepository.findByStatus(status, pageable);
+        restorationPage.forEach(this::loadBasicRelations);
+        return restorationPage;
     }
 
     @Transactional(readOnly = true)
     public Restoration getById(Long id) {
-        return restorationRepository.findById(id)
+        Restoration restoration = restorationRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("修复记录不存在"));
+        loadBasicRelations(restoration);
+        loadSteps(restoration);
+        return restoration;
+    }
+
+    private void loadBasicRelations(Restoration restoration) {
+        if (restoration.getProposedBy() != null) {
+            Optional<User> proposer = userRepository.findById(restoration.getProposedBy());
+            proposer.ifPresent(u -> restoration.setProposerName(u.getName()));
+        }
+        if (restoration.getApprovedBy() != null) {
+            Optional<User> approver = userRepository.findById(restoration.getApprovedBy());
+            approver.ifPresent(u -> restoration.setApproverName(u.getName()));
+        }
+        if (restoration.getArtifactId() != null) {
+            Optional<Artifact> artifact = artifactRepository.findById(restoration.getArtifactId());
+            artifact.ifPresent(a -> restoration.setArtifactName(a.getName()));
+        }
+    }
+
+    private void loadSteps(Restoration restoration) {
+        List<RestorationStep> steps = restorationStepRepository.findByRestorationIdOrderByStepOrder(restoration.getId());
+        restoration.setSteps(steps);
     }
 
     @Transactional

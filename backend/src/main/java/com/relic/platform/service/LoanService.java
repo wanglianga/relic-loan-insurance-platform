@@ -1,10 +1,7 @@
 package com.relic.platform.service;
 
-import com.relic.platform.entity.Loan;
-import com.relic.platform.entity.LoanEnvironment;
-import com.relic.platform.repository.ArtifactRepository;
-import com.relic.platform.repository.LoanEnvironmentRepository;
-import com.relic.platform.repository.LoanRepository;
+import com.relic.platform.entity.*;
+import com.relic.platform.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -14,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Service
 public class LoanService {
@@ -27,16 +25,67 @@ public class LoanService {
     @Autowired
     private ArtifactRepository artifactRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private InsuranceRepository insuranceRepository;
+
+    @Autowired
+    private TransportRepository transportRepository;
+
+    @Autowired
+    private ExhibitionRepository exhibitionRepository;
+
+    @Autowired
+    private ReturnRecordRepository returnRecordRepository;
+
     @Transactional(readOnly = true)
     public Page<Loan> list(int page, int size, String status, Long applicantId) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        return loanRepository.findByConditions(status, applicantId, pageable);
+        Page<Loan> loanPage = loanRepository.findByConditions(status, applicantId, pageable);
+        loanPage.forEach(this::loadBasicRelations);
+        return loanPage;
     }
 
     @Transactional(readOnly = true)
     public Loan getById(Long id) {
-        return loanRepository.findById(id)
+        Loan loan = loanRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("借展申请不存在"));
+        loadBasicRelations(loan);
+        loadDetailRelations(loan);
+        return loan;
+    }
+
+    private void loadBasicRelations(Loan loan) {
+        if (loan.getApplicantId() != null) {
+            Optional<User> applicant = userRepository.findById(loan.getApplicantId());
+            applicant.ifPresent(u -> loan.setApplicantName(u.getName()));
+        }
+        if (loan.getArtifactId() != null) {
+            Optional<Artifact> artifact = artifactRepository.findById(loan.getArtifactId());
+            artifact.ifPresent(a -> {
+                loan.setArtifactName(a.getName());
+                loan.setArtifactCode(a.getArtifactCode());
+            });
+        }
+    }
+
+    private void loadDetailRelations(Loan loan) {
+        Optional<LoanEnvironment> environment = loanEnvironmentRepository.findByLoanId(loan.getId());
+        environment.ifPresent(loan::setEnvironment);
+
+        Optional<Insurance> insurance = insuranceRepository.findByLoanId(loan.getId());
+        insurance.ifPresent(loan::setInsurance);
+
+        Optional<Transport> transport = transportRepository.findByLoanId(loan.getId());
+        transport.ifPresent(loan::setTransport);
+
+        Optional<Exhibition> exhibition = exhibitionRepository.findByLoanId(loan.getId());
+        exhibition.ifPresent(loan::setExhibition);
+
+        Optional<ReturnRecord> returnRecord = returnRecordRepository.findByLoanId(loan.getId());
+        returnRecord.ifPresent(loan::setReturnRecord);
     }
 
     @Transactional

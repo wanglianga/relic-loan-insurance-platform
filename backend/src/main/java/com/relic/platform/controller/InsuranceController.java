@@ -38,7 +38,7 @@ public class InsuranceController {
         }
     }
 
-    @PostMapping("/")
+    @PostMapping("")
     public ApiResponse<Insurance> create(@RequestBody Insurance insurance) {
         try {
             Insurance created = insuranceService.create(insurance);

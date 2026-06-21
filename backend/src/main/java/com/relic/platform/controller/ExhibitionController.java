@@ -16,7 +16,7 @@ public class ExhibitionController {
     @Autowired
     private ExhibitionService exhibitionService;
 
-    @GetMapping("/")
+    @GetMapping("")
     public ApiResponse<PageResult<Exhibition>> list(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -39,7 +39,7 @@ public class ExhibitionController {
         }
     }
 
-    @PostMapping("/")
+    @PostMapping("")
     public ApiResponse<Exhibition> create(@RequestBody Exhibition exhibition) {
         try {
             Exhibition created = exhibitionService.setup(exhibition);

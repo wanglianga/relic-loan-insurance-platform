@@ -37,4 +37,7 @@ public class Disease {
 
     @Column(name = "reported_at")
     private LocalDateTime reportedAt;
+
+    @Transient
+    private String reporterName;
 }

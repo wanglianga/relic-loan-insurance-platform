@@ -39,7 +39,7 @@ public class RestorationController {
         }
     }
 
-    @PostMapping("/")
+    @PostMapping("")
     public ApiResponse<Restoration> create(@RequestBody Restoration restoration,
                                            @RequestParam(required = false) Long proposerId) {
         try {

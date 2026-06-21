@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Entity
@@ -31,4 +32,9 @@ public class Exhibition {
 
     @Column(name = "status", nullable = false, length = 32)
     private String status;
+
+    @Transient
+    private String setupConfirmerName;
+    @Transient
+    private List<EnvironmentMonitor> environmentMonitors;
 }

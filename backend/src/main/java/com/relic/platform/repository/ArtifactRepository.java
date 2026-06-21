@@ -17,4 +17,6 @@ public interface ArtifactRepository extends JpaRepository<Artifact, Long> {
     Page<Artifact> findByConditions(@Param("status") String status,
                                     @Param("keyword") String keyword,
                                     Pageable pageable);
+
+    long countByStatus(String status);
 }

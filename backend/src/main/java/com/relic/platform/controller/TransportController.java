@@ -39,7 +39,7 @@ public class TransportController {
         }
     }
 
-    @PostMapping("/")
+    @PostMapping("")
     public ApiResponse<Transport> create(@RequestBody Transport transport) {
         try {
             Transport created = transportService.create(transport);

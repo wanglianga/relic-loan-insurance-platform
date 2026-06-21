@@ -17,4 +17,6 @@ public interface LoanRepository extends JpaRepository<Loan, Long> {
     Page<Loan> findByConditions(@Param("status") String status,
                                 @Param("applicantId") Long applicantId,
                                 Pageable pageable);
+
+    long countByStatus(String status);
 }

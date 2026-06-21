@@ -5,6 +5,11 @@ import lombok.Data;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import com.relic.platform.entity.LoanEnvironment;
+import com.relic.platform.entity.Insurance;
+import com.relic.platform.entity.Transport;
+import com.relic.platform.entity.Exhibition;
+import com.relic.platform.entity.ReturnRecord;
 
 @Data
 @Entity
@@ -44,4 +49,21 @@ public class Loan {
 
     @Column(name = "approved_at")
     private LocalDateTime approvedAt;
+
+    @Transient
+    private String applicantName;
+    @Transient
+    private String artifactName;
+    @Transient
+    private String artifactCode;
+    @Transient
+    private LoanEnvironment environment;
+    @Transient
+    private Insurance insurance;
+    @Transient
+    private Transport transport;
+    @Transient
+    private Exhibition exhibition;
+    @Transient
+    private ReturnRecord returnRecord;
 }

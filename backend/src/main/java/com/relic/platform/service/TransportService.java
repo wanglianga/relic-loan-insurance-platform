@@ -2,8 +2,10 @@ package com.relic.platform.service;
 
 import com.relic.platform.entity.Transport;
 import com.relic.platform.entity.TransportMonitor;
+import com.relic.platform.entity.User;
 import com.relic.platform.repository.TransportMonitorRepository;
 import com.relic.platform.repository.TransportRepository;
+import com.relic.platform.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -13,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
 
 @Service
 public class TransportService {
@@ -23,16 +27,40 @@ public class TransportService {
     @Autowired
     private TransportMonitorRepository transportMonitorRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
     @Transactional(readOnly = true)
     public Page<Transport> list(int page, int size, String status) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "sealedAt"));
-        return transportRepository.findByStatus(status, pageable);
+        Page<Transport> transportPage = transportRepository.findByStatus(status, pageable);
+        transportPage.forEach(this::loadBasicRelations);
+        return transportPage;
     }
 
     @Transactional(readOnly = true)
     public Transport getById(Long id) {
-        return transportRepository.findById(id)
+        Transport transport = transportRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("运输记录不存在"));
+        loadBasicRelations(transport);
+        loadMonitors(transport);
+        return transport;
+    }
+
+    private void loadBasicRelations(Transport transport) {
+        if (transport.getSealedBy() != null) {
+            Optional<User> sealer = userRepository.findById(transport.getSealedBy());
+            sealer.ifPresent(u -> transport.setSealerName(u.getName()));
+        }
+        if (transport.getEscortId() != null) {
+            Optional<User> escort = userRepository.findById(transport.getEscortId());
+            escort.ifPresent(u -> transport.setEscortName(u.getName()));
+        }
+    }
+
+    private void loadMonitors(Transport transport) {
+        List<TransportMonitor> monitors = transportMonitorRepository.findByTransportIdOrderByRecordedAtDesc(transport.getId());
+        transport.setMonitors(monitors);
     }
 
     @Transactional

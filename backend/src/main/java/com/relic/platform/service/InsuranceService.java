@@ -1,7 +1,9 @@
 package com.relic.platform.service;
 
 import com.relic.platform.entity.Insurance;
+import com.relic.platform.entity.User;
 import com.relic.platform.repository.InsuranceRepository;
+import com.relic.platform.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -11,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Service
 public class InsuranceService {
@@ -18,16 +21,30 @@ public class InsuranceService {
     @Autowired
     private InsuranceRepository insuranceRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
     @Transactional(readOnly = true)
     public Page<Insurance> list(int page, int size, String status) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "verifiedAt"));
-        return insuranceRepository.findByStatus(status, pageable);
+        Page<Insurance> insurancePage = insuranceRepository.findByStatus(status, pageable);
+        insurancePage.forEach(this::loadVerifierName);
+        return insurancePage;
     }
 
     @Transactional(readOnly = true)
     public Insurance getById(Long id) {
-        return insuranceRepository.findById(id)
+        Insurance insurance = insuranceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("保险记录不存在"));
+        loadVerifierName(insurance);
+        return insurance;
+    }
+
+    private void loadVerifierName(Insurance insurance) {
+        if (insurance.getVerifiedBy() != null) {
+            Optional<User> verifier = userRepository.findById(insurance.getVerifiedBy());
+            verifier.ifPresent(u -> insurance.setVerifierName(u.getName()));
+        }
     }
 
     @Transactional

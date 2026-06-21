@@ -16,7 +16,7 @@ public class ArtifactController {
     @Autowired
     private ArtifactService artifactService;
 
-    @GetMapping("/")
+    @GetMapping("")
     public ApiResponse<PageResult<Artifact>> list(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -40,7 +40,7 @@ public class ArtifactController {
         }
     }
 
-    @PostMapping("/")
+    @PostMapping("")
     public ApiResponse<Artifact> create(@RequestBody Artifact artifact) {
         try {
             Artifact created = artifactService.create(artifact);

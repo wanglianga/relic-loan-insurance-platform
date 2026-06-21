@@ -50,4 +50,7 @@ public class Artifact {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Transient
+    private ArtifactRestriction restriction;
 }

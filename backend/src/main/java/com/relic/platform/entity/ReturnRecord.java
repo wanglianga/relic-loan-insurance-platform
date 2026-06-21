@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Entity
@@ -31,4 +32,9 @@ public class ReturnRecord {
 
     @Column(name = "received_at")
     private LocalDateTime receivedAt;
+
+    @Transient
+    private String receiverName;
+    @Transient
+    private List<DamageRecord> damageRecords;
 }

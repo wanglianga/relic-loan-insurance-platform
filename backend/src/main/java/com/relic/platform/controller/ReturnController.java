@@ -16,7 +16,7 @@ public class ReturnController {
     @Autowired
     private ReturnService returnService;
 
-    @GetMapping("/")
+    @GetMapping("")
     public ApiResponse<PageResult<ReturnRecord>> list(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -39,7 +39,7 @@ public class ReturnController {
         }
     }
 
-    @PostMapping("/")
+    @PostMapping("")
     public ApiResponse<ReturnRecord> create(@RequestBody ReturnRecord record) {
         try {
             ReturnRecord created = returnService.create(record);

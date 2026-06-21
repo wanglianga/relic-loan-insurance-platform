@@ -8,9 +8,15 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
 public interface TransportRepository extends JpaRepository<Transport, Long> {
 
     @Query("SELECT t FROM Transport t WHERE :status IS NULL OR t.status = :status")
     Page<Transport> findByStatus(@Param("status") String status, Pageable pageable);
+
+    long countByStatus(String status);
+
+    Optional<Transport> findByLoanId(Long loanId);
 }

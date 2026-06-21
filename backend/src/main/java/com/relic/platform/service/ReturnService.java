@@ -2,8 +2,10 @@ package com.relic.platform.service;
 
 import com.relic.platform.entity.DamageRecord;
 import com.relic.platform.entity.ReturnRecord;
+import com.relic.platform.entity.User;
 import com.relic.platform.repository.DamageRecordRepository;
 import com.relic.platform.repository.ReturnRecordRepository;
+import com.relic.platform.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -13,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
 
 @Service
 public class ReturnService {
@@ -23,16 +27,36 @@ public class ReturnService {
     @Autowired
     private DamageRecordRepository damageRecordRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
     @Transactional(readOnly = true)
     public Page<ReturnRecord> list(int page, int size, String status) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "receivedAt"));
-        return returnRecordRepository.findByStatus(status, pageable);
+        Page<ReturnRecord> returnRecordPage = returnRecordRepository.findByStatus(status, pageable);
+        returnRecordPage.forEach(this::loadBasicRelations);
+        return returnRecordPage;
     }
 
     @Transactional(readOnly = true)
     public ReturnRecord getById(Long id) {
-        return returnRecordRepository.findById(id)
+        ReturnRecord returnRecord = returnRecordRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("归还记录不存在"));
+        loadBasicRelations(returnRecord);
+        loadDamageRecords(returnRecord);
+        return returnRecord;
+    }
+
+    private void loadBasicRelations(ReturnRecord returnRecord) {
+        if (returnRecord.getReceivedBy() != null) {
+            Optional<User> receiver = userRepository.findById(returnRecord.getReceivedBy());
+            receiver.ifPresent(u -> returnRecord.setReceiverName(u.getName()));
+        }
+    }
+
+    private void loadDamageRecords(ReturnRecord returnRecord) {
+        List<DamageRecord> damageRecords = damageRecordRepository.findByReturnId(returnRecord.getId());
+        returnRecord.setDamageRecords(damageRecords);
     }
 
     @Transactional

@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Entity
@@ -52,4 +53,11 @@ public class Transport {
 
     @Column(name = "arrived_at")
     private LocalDateTime arrivedAt;
+
+    @Transient
+    private List<TransportMonitor> monitors;
+    @Transient
+    private String sealerName;
+    @Transient
+    private String escortName;
 }

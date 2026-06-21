@@ -13,4 +13,6 @@ public interface RestorationRepository extends JpaRepository<Restoration, Long> 
 
     @Query("SELECT r FROM Restoration r WHERE :status IS NULL OR r.status = :status")
     Page<Restoration> findByStatus(@Param("status") String status, Pageable pageable);
+
+    long countByStatus(String status);
 }

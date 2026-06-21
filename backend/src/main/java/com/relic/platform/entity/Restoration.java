@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Entity
@@ -46,4 +47,13 @@ public class Restoration {
 
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
+
+    @Transient
+    private List<RestorationStep> steps;
+    @Transient
+    private String proposerName;
+    @Transient
+    private String approverName;
+    @Transient
+    private String artifactName;
 }

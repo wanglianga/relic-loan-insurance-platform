@@ -302,7 +302,24 @@ export interface EvidenceLog {
   artifactName?: string
 }
 
+export interface DashboardStats {
+  artifactTotal: number
+  artifactOnLoan: number
+  artifactUnderRestoration: number
+  artifactRegistered: number
+  loanPending: number
+  loanApproved: number
+  insurancePending: number
+  transportInTransit: number
+  exhibitionActive: number
+  restorationPending: number
+  diseaseTotal: number
+}
+
 export const api = {
+  dashboard: {
+    stats: () => request<ApiResponse<DashboardStats>>('/dashboard'),
+  },
   auth: {
     login: (data: LoginRequest) => request<ApiResponse<LoginResponse>>('/auth/login', { method: 'POST', body: data }),
     me: () => request<ApiResponse<UserInfo>>('/auth/me'),

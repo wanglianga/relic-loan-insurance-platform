@@ -10,7 +10,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -39,6 +42,12 @@ public class LoanService {
 
     @Autowired
     private ReturnRecordRepository returnRecordRepository;
+
+    @Autowired
+    private EnvironmentPreCheckRepository environmentPreCheckRepository;
+
+    @Autowired
+    private EnvironmentRiskRepository environmentRiskRepository;
 
     @Transactional(readOnly = true)
     public Page<Loan> list(int page, int size, String status, Long applicantId) {
@@ -106,6 +115,15 @@ public class LoanService {
         if (!"PENDING".equals(loan.getStatus())) {
             throw new RuntimeException("借展申请状态不允许审批");
         }
+        
+        Optional<EnvironmentPreCheck> preCheck = environmentPreCheckRepository.findFirstByLoanIdOrderBySubmittedAtDesc(id);
+        if (preCheck.isPresent()) {
+            Optional<EnvironmentRisk> risk = environmentRiskRepository.findByEnvironmentPrecheckId(preCheck.get().getId());
+            if (risk.isPresent() && Boolean.TRUE.equals(risk.get().getRequiresApproval())) {
+                throw new RuntimeException("该申请存在环境风险，需先完成风险 mitigation 后再审批");
+            }
+        }
+        
         loan.setStatus("APPROVED");
         loan.setApprovedAt(LocalDateTime.now());
         return loanRepository.save(loan);
@@ -136,12 +154,207 @@ public class LoanService {
 
         existing.setTemperatureMin(env.getTemperatureMin());
         existing.setTemperatureMax(env.getTemperatureMax());
+        existing.setTemperatureFluctuation(env.getTemperatureFluctuation());
         existing.setHumidityMin(env.getHumidityMin());
         existing.setHumidityMax(env.getHumidityMax());
+        existing.setHumidityFluctuation(env.getHumidityFluctuation());
         existing.setIlluminanceMax(env.getIlluminanceMax());
         existing.setVibrationMax(env.getVibrationMax());
         existing.setSecurityRoute(env.getSecurityRoute());
+        existing.setLightingPoints(env.getLightingPoints());
+        existing.setVisitorRoute(env.getVisitorRoute());
+        existing.setPatrolSchedule(env.getPatrolSchedule());
+        existing.setContinuousTemperatureData(env.getContinuousTemperatureData());
+        existing.setContinuousHumidityData(env.getContinuousHumidityData());
         existing.setSetupDate(env.getSetupDate());
         return loanEnvironmentRepository.save(existing);
+    }
+
+    @Transactional
+    public EnvironmentPreCheck submitEnvironmentPreCheck(Long loanId, EnvironmentPreCheck preCheck, Long submitterId) {
+        Loan loan = getById(loanId);
+        
+        preCheck.setId(null);
+        preCheck.setLoanId(loanId);
+        preCheck.setSubmittedBy(submitterId);
+        preCheck.setSubmittedAt(LocalDateTime.now());
+        
+        EnvironmentPreCheck saved = environmentPreCheckRepository.save(preCheck);
+        
+        loadSubmitterName(saved);
+        
+        Artifact artifact = artifactRepository.findById(loan.getArtifactId()).orElse(null);
+        if (artifact != null) {
+            EnvironmentRisk risk = assessEnvironmentRisk(saved, artifact);
+            saved.setLatestRisk(risk);
+        }
+        
+        return saved;
+    }
+
+    @Transactional
+    public EnvironmentRisk assessEnvironmentRisk(EnvironmentPreCheck preCheck, Artifact artifact) {
+        EnvironmentRisk risk = new EnvironmentRisk();
+        risk.setEnvironmentPrecheckId(preCheck.getId());
+        risk.setAssessedAt(LocalDateTime.now());
+        
+        String material = artifact.getMaterial();
+        List<String> riskFactors = new ArrayList<>();
+        List<String> suggestions = new ArrayList<>();
+        boolean requiresApproval = false;
+        String showcaseSuggestion = null;
+        Integer durationSuggestion = null;
+        List<String> monitoringEquipment = new ArrayList<>();
+        
+        if (material != null) {
+            String materialLower = material.toLowerCase();
+            
+            if (materialLower.contains("丝") || materialLower.contains("丝绸") || materialLower.contains("纺织")) {
+                if (preCheck.getTemperatureData() != null && preCheck.getTemperatureData().contains("high") ||
+                    preCheck.getHumidityData() != null && preCheck.getHumidityData().contains("high")) {
+                    riskFactors.add("丝织品面临高温高湿环境风险");
+                    suggestions.add("需使用恒温恒湿展柜");
+                    requiresApproval = true;
+                    showcaseSuggestion = "密闭式恒温恒湿展柜，配备除湿系统";
+                    monitoringEquipment.add("温湿度实时监测仪");
+                }
+                
+                if (preCheck.getLightingLayout() != null && preCheck.getLightingLayout().contains("high_illuminance")) {
+                    riskFactors.add("丝织品面临高照度环境风险，可能导致褪色老化");
+                    suggestions.add("需降低照度至50lux以下，使用紫外线过滤玻璃");
+                    requiresApproval = true;
+                    showcaseSuggestion = showcaseSuggestion != null ? showcaseSuggestion : "低反射紫外线过滤玻璃展柜";
+                    durationSuggestion = 30;
+                    monitoringEquipment.add("照度计");
+                    monitoringEquipment.add("紫外线监测仪");
+                }
+            }
+            
+            if (materialLower.contains("漆") || materialLower.contains("漆器")) {
+                if (preCheck.getHumidityData() != null && preCheck.getHumidityData().contains("fluctuation")) {
+                    riskFactors.add("漆器面临湿度波动风险，可能导致漆层开裂脱落");
+                    suggestions.add("需严格控制湿度波动在±5%以内");
+                    requiresApproval = true;
+                    showcaseSuggestion = "密闭式恒湿展柜，配备精密湿度控制系统";
+                    monitoringEquipment.add("高精度温湿度监测仪");
+                }
+                
+                if (preCheck.getVisitorFlow() != null && preCheck.getVisitorFlow().contains("high_traffic")) {
+                    riskFactors.add("漆器面临高观众流量风险，振动和微环境波动可能影响器物稳定性");
+                    suggestions.add("需设置独立展示区域，限制观众流量");
+                    requiresApproval = true;
+                    if (showcaseSuggestion == null) {
+                        showcaseSuggestion = "减震底座+独立防护围栏";
+                    }
+                    monitoringEquipment.add("振动监测仪");
+                }
+            }
+            
+            if (materialLower.contains("木") || materialLower.contains("木质")) {
+                if (preCheck.getHumidityData() != null && preCheck.getHumidityData().contains("dry")) {
+                    riskFactors.add("木质文物面临干燥环境风险，可能导致开裂变形");
+                    suggestions.add("需增加湿度至50-60%RH");
+                    requiresApproval = true;
+                    showcaseSuggestion = "加湿型展柜";
+                    monitoringEquipment.add("温湿度监测仪");
+                }
+            }
+            
+            if (materialLower.contains("金属") || materialLower.contains("铜") || materialLower.contains("铁")) {
+                if (preCheck.getHumidityData() != null && preCheck.getHumidityData().contains("high")) {
+                    riskFactors.add("金属文物面临高湿环境风险，可能加速锈蚀");
+                    suggestions.add("需使用干燥剂控制湿度在45%以下");
+                    requiresApproval = true;
+                    showcaseSuggestion = "充氮密封展柜";
+                    monitoringEquipment.add("湿度监测仪");
+                    monitoringEquipment.add("氧气浓度监测仪");
+                }
+            }
+            
+            if (materialLower.contains("纸") || materialLower.contains("纸质") || materialLower.contains("书画")) {
+                if (preCheck.getLightingLayout() != null && preCheck.getLightingLayout().contains("high_illuminance")) {
+                    riskFactors.add("纸质文物/书画面临高照度风险，可能导致纸张脆化、字迹褪色");
+                    suggestions.add("需降低照度至50lux以下，展期不超过30天");
+                    requiresApproval = true;
+                    showcaseSuggestion = "低反射紫外线过滤玻璃展柜";
+                    durationSuggestion = 30;
+                    monitoringEquipment.add("照度计");
+                    monitoringEquipment.add("紫外线监测仪");
+                }
+            }
+        }
+        
+        if (preCheck.getSecurityPatrolPlan() == null || preCheck.getSecurityPatrolPlan().isEmpty()) {
+            riskFactors.add("缺少安防巡更计划");
+            suggestions.add("需提交完整的安防巡更计划");
+            requiresApproval = true;
+        }
+        
+        if (riskFactors.isEmpty()) {
+            risk.setRiskLevel("LOW");
+            risk.setMitigationSuggestions("环境条件符合藏品展示要求，无需特殊 mitigation");
+        } else if (riskFactors.size() <= 2) {
+            risk.setRiskLevel("MEDIUM");
+        } else {
+            risk.setRiskLevel("HIGH");
+        }
+        
+        risk.setRiskFactors(String.join(";", riskFactors));
+        risk.setMitigationSuggestions(String.join(";", suggestions));
+        risk.setRequiresApproval(requiresApproval);
+        risk.setShowcaseSuggestion(showcaseSuggestion);
+        risk.setExhibitionDurationSuggestion(durationSuggestion);
+        risk.setMonitoringEquipment(String.join(";", monitoringEquipment));
+        
+        return environmentRiskRepository.save(risk);
+    }
+
+    @Transactional(readOnly = true)
+    public List<EnvironmentPreCheck> listPreChecksByLoan(Long loanId) {
+        List<EnvironmentPreCheck> preChecks = environmentPreCheckRepository.findByLoanIdOrderBySubmittedAtDesc(loanId);
+        preChecks.forEach(this::loadSubmitterName);
+        preChecks.forEach(this::loadRiskAssessment);
+        return preChecks;
+    }
+
+    @Transactional(readOnly = true)
+    public EnvironmentPreCheck getLatestPreCheck(Long loanId) {
+        EnvironmentPreCheck preCheck = environmentPreCheckRepository.findFirstByLoanIdOrderBySubmittedAtDesc(loanId)
+                .orElse(null);
+        if (preCheck != null) {
+            loadSubmitterName(preCheck);
+            loadRiskAssessment(preCheck);
+        }
+        return preCheck;
+    }
+
+    private void loadSubmitterName(EnvironmentPreCheck preCheck) {
+        if (preCheck.getSubmittedBy() != null) {
+            Optional<User> user = userRepository.findById(preCheck.getSubmittedBy());
+            user.ifPresent(u -> preCheck.setSubmitterName(u.getName()));
+        }
+    }
+
+    private void loadRiskAssessment(EnvironmentPreCheck preCheck) {
+        if (preCheck.getId() != null) {
+            Optional<EnvironmentRisk> risk = environmentRiskRepository.findByEnvironmentPrecheckId(preCheck.getId());
+            risk.ifPresent(preCheck::setLatestRisk);
+        }
+    }
+
+    @Transactional
+    public EnvironmentRisk mitigateRisk(Long preCheckId, String mitigationActions) {
+        EnvironmentPreCheck preCheck = environmentPreCheckRepository.findById(preCheckId)
+                .orElseThrow(() -> new RuntimeException("环境预审记录不存在"));
+        
+        EnvironmentRisk risk = environmentRiskRepository.findByEnvironmentPrecheckId(preCheckId)
+                .orElseThrow(() -> new RuntimeException("风险评估记录不存在"));
+        
+        String currentSuggestions = risk.getMitigationSuggestions();
+        risk.setMitigationSuggestions(currentSuggestions + ";已执行 mitigation: " + mitigationActions);
+        risk.setRequiresApproval(false);
+        risk.setAssessedAt(LocalDateTime.now());
+        
+        return environmentRiskRepository.save(risk);
     }
 }

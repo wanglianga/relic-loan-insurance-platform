@@ -2,6 +2,8 @@ package com.relic.platform.controller;
 
 import com.relic.platform.dto.ApiResponse;
 import com.relic.platform.dto.PageResult;
+import com.relic.platform.entity.EnvironmentPreCheck;
+import com.relic.platform.entity.EnvironmentRisk;
 import com.relic.platform.entity.Loan;
 import com.relic.platform.entity.LoanEnvironment;
 import com.relic.platform.service.LoanService;
@@ -9,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -82,6 +85,52 @@ public class LoanController {
         try {
             LoanEnvironment updated = loanService.updateEnvironment(id, env);
             return ApiResponse.success(updated);
+        } catch (RuntimeException e) {
+            return ApiResponse.error(e.getMessage());
+        }
+    }
+
+    @PostMapping("/{id}/environment-precheck")
+    public ApiResponse<EnvironmentPreCheck> submitEnvironmentPreCheck(
+            @PathVariable Long id,
+            @RequestBody EnvironmentPreCheck preCheck,
+            @RequestParam(required = false) Long submitterId) {
+        try {
+            EnvironmentPreCheck saved = loanService.submitEnvironmentPreCheck(id, preCheck, submitterId);
+            return ApiResponse.success(saved);
+        } catch (RuntimeException e) {
+            return ApiResponse.error(e.getMessage());
+        }
+    }
+
+    @GetMapping("/{id}/environment-prechecks")
+    public ApiResponse<List<EnvironmentPreCheck>> listPreChecksByLoan(@PathVariable Long id) {
+        try {
+            List<EnvironmentPreCheck> preChecks = loanService.listPreChecksByLoan(id);
+            return ApiResponse.success(preChecks);
+        } catch (RuntimeException e) {
+            return ApiResponse.error(e.getMessage());
+        }
+    }
+
+    @GetMapping("/{id}/environment-precheck/latest")
+    public ApiResponse<EnvironmentPreCheck> getLatestPreCheck(@PathVariable Long id) {
+        try {
+            EnvironmentPreCheck preCheck = loanService.getLatestPreCheck(id);
+            return ApiResponse.success(preCheck);
+        } catch (RuntimeException e) {
+            return ApiResponse.error(e.getMessage());
+        }
+    }
+
+    @PutMapping("/environment-prechecks/{preCheckId}/mitigate")
+    public ApiResponse<EnvironmentRisk> mitigateRisk(
+            @PathVariable Long preCheckId,
+            @RequestBody Map<String, String> body) {
+        try {
+            String mitigationActions = body.get("mitigationActions");
+            EnvironmentRisk risk = loanService.mitigateRisk(preCheckId, mitigationActions);
+            return ApiResponse.success(risk);
         } catch (RuntimeException e) {
             return ApiResponse.error(e.getMessage());
         }

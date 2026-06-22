@@ -91,6 +91,7 @@ export interface Artifact {
   name: string
   era: string | null
   material: string | null
+  materialCategory: string | null
   dimensions: string | null
   source: string | null
   acquisitionDate: string | null
@@ -122,9 +123,71 @@ export interface Disease {
   description: string | null
   location: string | null
   photoUrl: string | null
+  annotationX: number | null
+  annotationY: number | null
+  annotationWidth: number | null
+  annotationHeight: number | null
+  hdPhotoUrl: string | null
+  reviewStatus: string | null
   reportedBy: number
   reportedAt: string
   reporterName?: string
+  latestReview?: DiseaseReview
+}
+
+export interface DiseaseReview {
+  id: number
+  diseaseId: number
+  loanId: number | null
+  affectsLoanGrade: boolean | null
+  loanGradeImpact: string | null
+  reviewerId: number
+  reviewNotes: string | null
+  reviewedAt: string
+  reviewerName?: string
+  diseaseType?: string
+  disease?: Disease
+  exhibitionCondition?: ExhibitionCondition
+}
+
+export interface ExhibitionCondition {
+  id: number
+  loanId: number
+  diseaseReviewId: number | null
+  displayDistanceMin: number | null
+  illuminanceLimit: number | null
+  bracketRequirements: string | null
+  insuranceAdditionalTerms: string | null
+  otherRequirements: string | null
+  createdAt: string
+}
+
+export interface EnvironmentPreCheck {
+  id: number
+  loanId: number
+  temperatureData: string | null
+  humidityData: string | null
+  lightingLayout: string | null
+  visitorFlow: string | null
+  securityPatrolPlan: string | null
+  submittedBy: number
+  submittedAt: string
+  createdAt: string
+  submitterName?: string
+  latestRisk?: EnvironmentRisk
+}
+
+export interface EnvironmentRisk {
+  id: number
+  environmentPrecheckId: number
+  riskLevel: string
+  riskFactors: string | null
+  mitigationSuggestions: string | null
+  requiresApproval: boolean | null
+  showcaseSuggestion: string | null
+  exhibitionDurationSuggestion: number | null
+  monitoringEquipment: string | null
+  assessedAt: string
 }
 
 export interface Restoration {
@@ -187,11 +250,18 @@ export interface LoanEnvironment {
   loanId: number
   temperatureMin: number | null
   temperatureMax: number | null
+  temperatureFluctuation: number | null
   humidityMin: number | null
   humidityMax: number | null
+  humidityFluctuation: number | null
   illuminanceMax: number | null
   vibrationMax: number | null
   securityRoute: string | null
+  lightingPoints: string | null
+  visitorRoute: string | null
+  patrolSchedule: string | null
+  continuousTemperatureData: string | null
+  continuousHumidityData: string | null
   setupDate: string | null
 }
 
@@ -333,8 +403,15 @@ export const api = {
   },
   diseases: {
     list: (params?: Record<string, any>) => request<ApiResponse<PageResult<Disease>>>('/diseases', { params }),
+    get: (id: number) => request<ApiResponse<Disease>>(`/diseases/${id}`),
     listByArtifact: (artifactId: number) => request<ApiResponse<Disease[]>>(`/diseases/artifact/${artifactId}`),
     create: (data: Partial<Disease>) => request<ApiResponse<Disease>>('/diseases', { method: 'POST', body: data }),
+    updateAnnotation: (id: number, data: Record<string, any>) => request<ApiResponse<Disease>>(`/diseases/${id}/annotation`, { method: 'PUT', body: data }),
+    review: (id: number, data: Record<string, any>) => request<ApiResponse<DiseaseReview>>(`/diseases/${id}/review`, { method: 'POST', body: data }),
+    generateExhibitionCondition: (reviewId: number, loanId: number) => request<ApiResponse<ExhibitionCondition>>(`/diseases/reviews/${reviewId}/exhibition-condition`, { method: 'POST', body: { loanId } }),
+    listReviews: (diseaseId: number) => request<ApiResponse<DiseaseReview[]>>(`/diseases/${diseaseId}/reviews`),
+    listReviewsByLoan: (loanId: number) => request<ApiResponse<DiseaseReview[]>>(`/diseases/loan/${loanId}/reviews`),
+    listExhibitionConditionsByLoan: (loanId: number) => request<ApiResponse<ExhibitionCondition[]>>(`/diseases/loan/${loanId}/exhibition-conditions`),
   },
   restorations: {
     list: (params?: Record<string, any>) => request<ApiResponse<PageResult<Restoration>>>('/restorations', { params }),
@@ -351,6 +428,10 @@ export const api = {
     approve: (id: number) => request<ApiResponse<Loan>>(`/loans/${id}/approve`, { method: 'PUT' }),
     reject: (id: number, reason: string) => request<ApiResponse<Loan>>(`/loans/${id}/reject`, { method: 'PUT', body: { rejectionReason: reason } }),
     updateEnvironment: (id: number, data: Partial<LoanEnvironment>) => request<ApiResponse<LoanEnvironment>>(`/loans/${id}/environment`, { method: 'PUT', body: data }),
+    submitEnvironmentPreCheck: (id: number, data: Partial<EnvironmentPreCheck>) => request<ApiResponse<EnvironmentPreCheck>>(`/loans/${id}/environment-precheck`, { method: 'POST', body: data }),
+    listPreChecks: (id: number) => request<ApiResponse<EnvironmentPreCheck[]>>(`/loans/${id}/environment-prechecks`),
+    getLatestPreCheck: (id: number) => request<ApiResponse<EnvironmentPreCheck>>(`/loans/${id}/environment-precheck/latest`),
+    mitigateRisk: (preCheckId: number, mitigationActions: string) => request<ApiResponse<EnvironmentRisk>>(`/loans/environment-prechecks/${preCheckId}/mitigate`, { method: 'PUT', body: { mitigationActions } }),
   },
   insurances: {
     list: (params?: Record<string, any>) => request<ApiResponse<PageResult<Insurance>>>('/insurances', { params }),

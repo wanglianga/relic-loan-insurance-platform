@@ -41,6 +41,18 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '病害图谱', roles: ['COLLECTION', 'RESTORER'] },
       },
       {
+        path: 'diseases/review',
+        name: 'disease-review',
+        component: () => import('@/pages/DiseaseReviewPage.vue'),
+        meta: { title: '病害复核', roles: ['COLLECTION'] },
+      },
+      {
+        path: 'loans/environment-precheck',
+        name: 'environment-precheck',
+        component: () => import('@/pages/EnvironmentPreCheckPage.vue'),
+        meta: { title: '展厅环境预审', roles: ['COLLECTION', 'BORROWER'] },
+      },
+      {
         path: 'restorations',
         name: 'restoration-list',
         component: () => import('@/pages/RestorationPlanPage.vue'),

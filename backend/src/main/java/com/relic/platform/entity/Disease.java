@@ -3,6 +3,7 @@ package com.relic.platform.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -32,6 +33,24 @@ public class Disease {
     @Column(name = "photo_url", length = 512)
     private String photoUrl;
 
+    @Column(name = "annotation_x", precision = 8, scale = 4)
+    private BigDecimal annotationX;
+
+    @Column(name = "annotation_y", precision = 8, scale = 4)
+    private BigDecimal annotationY;
+
+    @Column(name = "annotation_width", precision = 8, scale = 4)
+    private BigDecimal annotationWidth;
+
+    @Column(name = "annotation_height", precision = 8, scale = 4)
+    private BigDecimal annotationHeight;
+
+    @Column(name = "hd_photo_url", length = 512)
+    private String hdPhotoUrl;
+
+    @Column(name = "review_status", length = 32)
+    private String reviewStatus;
+
     @Column(name = "reported_by", nullable = false)
     private Long reportedBy;
 
@@ -40,4 +59,7 @@ public class Disease {
 
     @Transient
     private String reporterName;
+
+    @Transient
+    private DiseaseReview latestReview;
 }

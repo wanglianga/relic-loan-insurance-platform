@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
-import { FileText, Check, X, Eye } from 'lucide-vue-next'
-import { api, type Loan, type Artifact, type PageResult } from '@/api'
+import { FileText, Check, X, Eye, AlertTriangle, Shield, ClipboardCheck, FileWarning } from 'lucide-vue-next'
+import { api, type Loan, type Artifact, type PageResult, type EnvironmentPreCheck, type EnvironmentRisk, type DiseaseReview, type ExhibitionCondition } from '@/api'
 
 const STATUS_MAP: Record<string, string> = {
   PENDING: '待审批',
@@ -17,6 +17,33 @@ const STATUS_COLORS: Record<string, string> = {
   REJECTED: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
   ACTIVE: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
   COMPLETED: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
+}
+
+const RISK_LEVEL_LABELS: Record<string, string> = {
+  LOW: '低风险',
+  MEDIUM: '中风险',
+  HIGH: '高风险',
+  CRITICAL: '极高风险',
+}
+
+const RISK_LEVEL_COLORS: Record<string, string> = {
+  LOW: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  MEDIUM: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  HIGH: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+  CRITICAL: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+}
+
+const DISEASE_TYPE_LABELS: Record<string, string> = {
+  CRACK: '裂隙',
+  DISCOLORATION: '变色',
+  SURFACE_WEAR: '表面磨损',
+  PEELING: '剥落',
+  INSECT_DAMAGE: '虫蛀',
+  PIGMENT_POWDERING: '颜料粉化',
+  GLAZE_CRACKING: '釉面开片',
+  PAINT_PEELING: '彩绘脱落',
+  WOOD_DEFORMATION: '木胎变形',
+  METAL_CORROSION: '金属锈蚀',
 }
 
 const STATUSES = [
@@ -38,6 +65,12 @@ const showDetail = ref(false)
 const detailLoading = ref(false)
 const detail = ref<Loan | null>(null)
 const detailArtifact = ref<Artifact | null>(null)
+const latestPreCheck = ref<EnvironmentPreCheck | null>(null)
+const latestRisk = ref<EnvironmentRisk | null>(null)
+const diseaseReviews = ref<DiseaseReview[]>([])
+const exhibitionConditions = ref<ExhibitionCondition[]>([])
+const loadingRisk = ref(false)
+const loadingReviews = ref(false)
 
 const showRejectModal = ref(false)
 const rejectLoanId = ref<number | null>(null)
@@ -63,11 +96,46 @@ async function fetchLoans() {
   }
 }
 
+async function loadRiskAndReviews(loanId: number) {
+  loadingRisk.value = true
+  loadingReviews.value = true
+  try {
+    const preCheckRes = await api.loans.getLatestPreCheck(loanId)
+    latestPreCheck.value = preCheckRes.data
+    latestRisk.value = preCheckRes.data.latestRisk || null
+  } catch {
+    latestPreCheck.value = null
+    latestRisk.value = null
+  } finally {
+    loadingRisk.value = false
+  }
+
+  try {
+    const reviewsRes = await api.diseases.listReviewsByLoan(loanId)
+    diseaseReviews.value = reviewsRes.data
+  } catch {
+    diseaseReviews.value = []
+  } finally {
+    loadingReviews.value = false
+  }
+
+  try {
+    const conditionsRes = await api.diseases.listExhibitionConditionsByLoan(loanId)
+    exhibitionConditions.value = conditionsRes.data
+  } catch {
+    exhibitionConditions.value = []
+  }
+}
+
 async function viewDetail(id: number) {
   showDetail.value = true
   detailLoading.value = true
   detail.value = null
   detailArtifact.value = null
+  latestPreCheck.value = null
+  latestRisk.value = null
+  diseaseReviews.value = []
+  exhibitionConditions.value = []
   try {
     const res = await api.loans.get(id)
     detail.value = res.data
@@ -79,6 +147,7 @@ async function viewDetail(id: number) {
         detailArtifact.value = null
       }
     }
+    await loadRiskAndReviews(id)
   } catch {
     detail.value = null
   } finally {
@@ -86,7 +155,34 @@ async function viewDetail(id: number) {
   }
 }
 
+function hasUnresolvedRisk(): boolean {
+  return latestRisk.value?.requiresApproval === true
+}
+
+function hasAffectedDisease(): boolean {
+  return diseaseReviews.value.some(r => r.affectsLoanGrade === true)
+}
+
+function hasApprovalBlocker(): boolean {
+  return hasUnresolvedRisk() || hasAffectedDisease()
+}
+
+function getBlockerMessages(): string[] {
+  const messages: string[] = []
+  if (hasUnresolvedRisk()) {
+    messages.push('存在未处理的环境高风险，请先完成风险 mitigation')
+  }
+  if (hasAffectedDisease()) {
+    messages.push('存在影响借展等级的病害，请确认展示条件已落实')
+  }
+  return messages
+}
+
 async function approveLoan(id: number) {
+  if (hasApprovalBlocker()) {
+    alert('存在审批拦截项，请先处理风险和病害问题后再批准')
+    return
+  }
   approving.value = id
   try {
     await api.loans.approve(id)
@@ -169,9 +265,11 @@ watch(page, fetchLoans)
 
 <template>
   <div class="space-y-4">
-    <div class="flex items-center gap-2">
-      <FileText class="w-5 h-5 text-amber-600" />
-      <h2 class="text-lg font-semibold text-gray-900 dark:text-white">借展审批</h2>
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <FileText class="w-5 h-5 text-amber-600" />
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">借展审批</h2>
+      </div>
     </div>
 
     <div class="flex flex-col sm:flex-row gap-3">
@@ -301,7 +399,7 @@ watch(page, fetchLoans)
         class="fixed inset-0 z-50 flex items-center justify-center p-4"
       >
         <div class="fixed inset-0 bg-black/50" @click="showDetail = false"></div>
-        <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-gray-700">
+        <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-gray-700">
           <div class="sticky top-0 bg-white dark:bg-gray-800 px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between z-10">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">借展详情</h3>
             <button @click="showDetail = false" class="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors">
@@ -318,6 +416,16 @@ watch(page, fetchLoans)
               </div>
               <ul class="space-y-1">
                 <li v-for="(msg, i) in getViolationMessages()" :key="i" class="text-sm text-red-600 dark:text-red-400">· {{ msg }}</li>
+              </ul>
+            </div>
+
+            <div v-if="hasApprovalBlocker()" class="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4">
+              <div class="flex items-center gap-2 mb-2">
+                <FileWarning class="w-4 h-4 text-red-600 dark:text-red-400" />
+                <span class="text-sm font-semibold text-red-700 dark:text-red-400">审批拦截</span>
+              </div>
+              <ul class="space-y-1">
+                <li v-for="(msg, i) in getBlockerMessages()" :key="i" class="text-sm text-red-600 dark:text-red-400">· {{ msg }}</li>
               </ul>
             </div>
 
@@ -356,9 +464,124 @@ watch(page, fetchLoans)
                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">借展结束日期</p>
                 <p class="text-sm text-gray-900 dark:text-white">{{ formatDate(detail.loanEndDate) }}</p>
               </div>
-              <div v-if="detail.rejectionReason">
+              <div v-if="detail.rejectionReason" class="col-span-2">
                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">驳回原因</p>
                 <p class="text-sm text-red-600 dark:text-red-400">{{ detail.rejectionReason }}</p>
+              </div>
+            </div>
+
+            <div v-if="loadingRisk" class="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">
+              加载环境风险信息...
+            </div>
+            <div v-else-if="latestRisk" class="border-t border-gray-200 dark:border-gray-700 pt-4">
+              <div class="flex items-center gap-2 mb-3">
+                <Shield class="w-4 h-4 text-amber-600" />
+                <h4 class="text-sm font-semibold text-gray-900 dark:text-white">环境风险评估</h4>
+                <span :class="['inline-flex px-2 py-0.5 rounded-full text-xs font-medium', RISK_LEVEL_COLORS[latestRisk.riskLevel] || '']">
+                  {{ RISK_LEVEL_LABELS[latestRisk.riskLevel] || latestRisk.riskLevel }}
+                </span>
+              </div>
+              <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 space-y-3">
+                <div v-if="latestRisk.requiresApproval" class="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 border border-red-200 dark:border-red-800">
+                  <p class="text-sm text-red-600 dark:text-red-400">⚠️ 该申请存在高风险，无法直接通过审批</p>
+                </div>
+                <div v-if="latestRisk.riskFactors">
+                  <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">识别风险因素</p>
+                  <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{{ latestRisk.riskFactors }}</p>
+                </div>
+                <div v-if="latestRisk.mitigationSuggestions">
+                  <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">风险缓解建议</p>
+                  <p class="text-sm text-amber-700 dark:text-amber-400 whitespace-pre-line">{{ latestRisk.mitigationSuggestions }}</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                  <div v-if="latestRisk.showcaseSuggestion" class="bg-white dark:bg-gray-700 rounded p-3">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">展柜建议</p>
+                    <p class="text-sm text-gray-900 dark:text-white">{{ latestRisk.showcaseSuggestion }}</p>
+                  </div>
+                  <div v-if="latestRisk.exhibitionDurationSuggestion" class="bg-white dark:bg-gray-700 rounded p-3">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">展期建议</p>
+                    <p class="text-sm text-gray-900 dark:text-white">不超过 {{ latestRisk.exhibitionDurationSuggestion }} 天</p>
+                  </div>
+                  <div v-if="latestRisk.monitoringEquipment" class="bg-white dark:bg-gray-700 rounded p-3 md:col-span-2">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">监测设备</p>
+                    <p class="text-sm text-gray-900 dark:text-white">{{ latestRisk.monitoringEquipment }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-else class="border-t border-gray-200 dark:border-gray-700 pt-4">
+              <div class="flex items-center gap-2 mb-2">
+                <Shield class="w-4 h-4 text-gray-400" />
+                <p class="text-sm text-gray-500 dark:text-gray-400">暂无环境风险评估记录</p>
+              </div>
+            </div>
+
+            <div v-if="loadingReviews" class="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">
+              加载病害复核信息...
+            </div>
+            <div v-else-if="diseaseReviews.length > 0" class="border-t border-gray-200 dark:border-gray-700 pt-4">
+              <div class="flex items-center gap-2 mb-3">
+                <ClipboardCheck class="w-4 h-4 text-blue-600" />
+                <h4 class="text-sm font-semibold text-gray-900 dark:text-white">病害复核记录</h4>
+              </div>
+              <div class="space-y-3">
+                <div v-for="(review, idx) in diseaseReviews" :key="idx" class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+                  <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm font-medium text-gray-900 dark:text-white">{{ DISEASE_TYPE_LABELS[review.diseaseType] || review.diseaseType }}</span>
+                      <span v-if="review.affectsLoanGrade" class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                        影响借展等级
+                      </span>
+                      <span v-else class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                        不影响借展
+                      </span>
+                    </div>
+                    <span class="text-xs text-gray-500 dark:text-gray-400">{{ review.reviewedAt?.substring(0, 16) }}</span>
+                  </div>
+                  <p v-if="review.loanGradeImpact" class="text-sm text-gray-700 dark:text-gray-300 mb-2">
+                    <span class="text-gray-500 dark:text-gray-400">影响说明：</span>{{ review.loanGradeImpact }}
+                  </p>
+                  <p v-if="review.reviewNotes" class="text-sm text-gray-700 dark:text-gray-300">
+                    <span class="text-gray-500 dark:text-gray-400">复核意见：</span>{{ review.reviewNotes }}
+                  </p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">复核人：{{ review.reviewerName || '-' }}</p>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="exhibitionConditions.length > 0" class="border-t border-gray-200 dark:border-gray-700 pt-4">
+              <div class="flex items-center gap-2 mb-3">
+                <AlertTriangle class="w-4 h-4 text-amber-600" />
+                <h4 class="text-sm font-semibold text-gray-900 dark:text-white">展示条件要求</h4>
+              </div>
+              <div class="space-y-3">
+                <div v-for="(cond, idx) in exhibitionConditions" :key="idx" class="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
+                  <div class="grid grid-cols-2 gap-4 mb-3">
+                    <div>
+                      <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">最小展示距离</p>
+                      <p class="text-lg font-bold text-gray-900 dark:text-white">{{ cond.displayDistanceMin }} 米</p>
+                    </div>
+                    <div>
+                      <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">照度上限</p>
+                      <p class="text-lg font-bold text-gray-900 dark:text-white">{{ cond.illuminanceLimit }} lux</p>
+                    </div>
+                  </div>
+                  <div class="space-y-2">
+                    <div>
+                      <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">支架要求</p>
+                      <p class="text-sm text-gray-900 dark:text-white">{{ cond.bracketRequirements }}</p>
+                    </div>
+                    <div>
+                      <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">保险附加条件</p>
+                      <p class="text-sm text-gray-900 dark:text-white">{{ cond.insuranceAdditionalTerms }}</p>
+                    </div>
+                    <div v-if="cond.otherRequirements">
+                      <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">其他要求</p>
+                      <p class="text-sm text-gray-900 dark:text-white">{{ cond.otherRequirements }}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -434,8 +657,9 @@ watch(page, fetchLoans)
               </button>
               <button
                 @click="approveLoan(detail.id)"
-                :disabled="approving === detail.id"
-                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
+                :disabled="approving === detail.id || hasApprovalBlocker()"
+                :title="hasApprovalBlocker() ? '存在审批拦截项，请先处理' : ''"
+                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Check class="w-4 h-4" />
                 {{ approving === detail.id ? '审批中...' : '批准' }}

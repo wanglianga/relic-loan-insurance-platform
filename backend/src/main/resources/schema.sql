@@ -45,10 +45,72 @@ CREATE TABLE IF NOT EXISTS `disease` (
   `description` TEXT,
   `location` VARCHAR(256),
   `photo_url` VARCHAR(512),
+  `annotation_x` DECIMAL(8,4),
+  `annotation_y` DECIMAL(8,4),
+  `annotation_width` DECIMAL(8,4),
+  `annotation_height` DECIMAL(8,4),
+  `hd_photo_url` VARCHAR(512),
+  `review_status` VARCHAR(32) DEFAULT 'PENDING',
   `reported_by` BIGINT NOT NULL,
   `reported_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (`artifact_id`) REFERENCES `artifact`(`id`),
   FOREIGN KEY (`reported_by`) REFERENCES `user`(`id`)
+);
+
+CREATE TABLE IF NOT EXISTS `disease_review` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `disease_id` BIGINT NOT NULL,
+  `loan_id` BIGINT,
+  `affects_loan_grade` BOOLEAN DEFAULT FALSE,
+  `loan_grade_impact` TEXT,
+  `reviewer_id` BIGINT NOT NULL,
+  `review_notes` TEXT,
+  `reviewed_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`disease_id`) REFERENCES `disease`(`id`),
+  FOREIGN KEY (`loan_id`) REFERENCES `loan`(`id`),
+  FOREIGN KEY (`reviewer_id`) REFERENCES `user`(`id`)
+);
+
+CREATE TABLE IF NOT EXISTS `exhibition_condition` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `loan_id` BIGINT NOT NULL,
+  `disease_review_id` BIGINT,
+  `display_distance_min` DECIMAL(6,2),
+  `illuminance_limit` DECIMAL(8,2),
+  `bracket_requirements` TEXT,
+  `insurance_additional_terms` TEXT,
+  `other_requirements` TEXT,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`loan_id`) REFERENCES `loan`(`id`),
+  FOREIGN KEY (`disease_review_id`) REFERENCES `disease_review`(`id`)
+);
+
+CREATE TABLE IF NOT EXISTS `environment_precheck` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `loan_id` BIGINT NOT NULL,
+  `temperature_data` TEXT,
+  `humidity_data` TEXT,
+  `lighting_layout` TEXT,
+  `visitor_flow` TEXT,
+  `security_patrol_plan` TEXT,
+  `submitted_by` BIGINT NOT NULL,
+  `submitted_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`loan_id`) REFERENCES `loan`(`id`),
+  FOREIGN KEY (`submitted_by`) REFERENCES `user`(`id`)
+);
+
+CREATE TABLE IF NOT EXISTS `environment_risk` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `environment_precheck_id` BIGINT NOT NULL,
+  `risk_level` VARCHAR(32) NOT NULL,
+  `risk_factors` TEXT,
+  `mitigation_suggestions` TEXT,
+  `requires_approval` BOOLEAN DEFAULT FALSE,
+  `showcase_suggestion` TEXT,
+  `exhibition_duration_suggestion` INT,
+  `monitoring_equipment` TEXT,
+  `assessed_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`environment_precheck_id`) REFERENCES `environment_precheck`(`id`)
 );
 
 CREATE TABLE IF NOT EXISTS `restoration` (
@@ -105,11 +167,18 @@ CREATE TABLE IF NOT EXISTS `loan_environment` (
   `loan_id` BIGINT NOT NULL,
   `temperature_min` DECIMAL(5,2),
   `temperature_max` DECIMAL(5,2),
+  `temperature_fluctuation` DECIMAL(5,2),
   `humidity_min` DECIMAL(5,2),
   `humidity_max` DECIMAL(5,2),
+  `humidity_fluctuation` DECIMAL(5,2),
   `illuminance_max` DECIMAL(8,2),
   `vibration_max` DECIMAL(8,4),
   `security_route` TEXT,
+  `lighting_points` TEXT,
+  `visitor_route` TEXT,
+  `patrol_schedule` TEXT,
+  `continuous_temperature_data` TEXT,
+  `continuous_humidity_data` TEXT,
   `setup_date` DATE,
   FOREIGN KEY (`loan_id`) REFERENCES `loan`(`id`)
 );

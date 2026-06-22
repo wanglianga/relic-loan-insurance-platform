@@ -20,6 +20,8 @@ import {
   ChevronLeft,
   Menu,
   Camera,
+  ClipboardCheck,
+  Thermometer,
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -34,9 +36,11 @@ const navItems = computed(() => {
     { path: '/dashboard', label: '工作台', icon: LayoutDashboard, roles: ['COLLECTION', 'RESTORER', 'BORROWER', 'INSURER', 'SECURITY', 'TRANSPORT'] },
     { path: '/artifacts', label: '藏品管理', icon: Archive, roles: ['COLLECTION', 'RESTORER', 'BORROWER', 'INSURER', 'SECURITY'] },
     { path: '/diseases', label: '病害图谱', icon: Bug, roles: ['COLLECTION', 'RESTORER'] },
+    { path: '/diseases/review', label: '病害复核', icon: ClipboardCheck, roles: ['COLLECTION'] },
     { path: '/restorations', label: '修复方案', icon: Wrench, roles: ['COLLECTION', 'RESTORER'] },
     { path: '/loans/apply', label: '借展申请', icon: FileText, roles: ['BORROWER', 'COLLECTION'] },
     { path: '/loans/approval', label: '借展审批', icon: FileText, roles: ['COLLECTION'] },
+    { path: '/loans/environment-precheck', label: '展厅环境预审', icon: Thermometer, roles: ['COLLECTION', 'BORROWER'] },
     { path: '/insurance', label: '保险核验', icon: Shield, roles: ['INSURER', 'COLLECTION'] },
     { path: '/packaging', label: '包装出库', icon: Package, roles: ['SECURITY', 'TRANSPORT', 'COLLECTION'] },
     { path: '/transport', label: '运输监管', icon: Package, roles: ['TRANSPORT', 'SECURITY'] },

@@ -121,11 +121,13 @@ npm run dev
 │   │   ├── DashboardPage.vue
 │   │   ├── ArtifactListPage.vue
 │   │   ├── ArtifactDetailPage.vue
-│   │   ├── DiseaseMapPage.vue
+│   │   ├── DiseaseMapPage.vue      # 病害图谱（含高清图标注）
+│   │   ├── DiseaseReviewPage.vue   # 病害复核（藏品部）
+│   │   ├── EnvironmentPreCheckPage.vue  # 展厅环境预审
 │   │   ├── RestorationPlanPage.vue
 │   │   ├── RestorationDetailPage.vue
 │   │   ├── LoanApplyPage.vue
-│   │   ├── LoanApprovalPage.vue
+│   │   ├── LoanApprovalPage.vue  # 借展审批（含风险展示）
 │   │   ├── InsuranceVerifyPage.vue
 │   │   ├── PackagingPage.vue
 │   │   ├── TransportMonitorPage.vue
